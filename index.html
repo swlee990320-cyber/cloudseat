@@ -1,0 +1,1430 @@
+<!DOCTYPE html>
+<html lang="ko" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CloudSeat - 클라우드 계정 사용 현황 모니터링</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            },
+            darkBg: '#0f172a',
+            darkCard: '#1e293b',
+            darkBorder: '#334155'
+          },
+          fontFamily: {
+            sans: ['Inter', 'Pretendard', 'system-ui', '-apple-system', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Tone.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+
+  <style>
+    @keyframes pulse-subtle {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    .animate-pulse-subtle {
+      animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.05);
+    }
+    .dark ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(100, 116, 139, 0.4);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(100, 116, 139, 0.7);
+    }
+  </style>
+</head>
+
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans transition-colors duration-200">
+
+  <!-- Header -->
+  <header class="sticky top-0 z-40 bg-slate-800/90 backdrop-blur-md border-b border-slate-700 px-4 lg:px-8 py-3.5 flex items-center justify-between">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 text-white font-black text-xl">
+        <i class="fa-solid fa-cloud-bolt"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-lg font-bold tracking-tight text-white">CloudSeat</h1>
+          <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Live Monitor</span>
+        </div>
+        <p class="text-xs text-slate-400">클라우드 계정 실시간 점유 & 세션 관리 센터</p>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex items-center space-x-2 sm:space-x-3">
+      <button onclick="openAddAccountModal()" class="px-3.5 py-2 text-xs sm:text-sm font-medium rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white transition-all shadow-md shadow-indigo-600/30 flex items-center gap-2">
+        <i class="fa-solid fa-plus"></i>
+        <span class="hidden sm:inline">계정 추가</span>
+      </button>
+
+      <button onclick="openLogsModal()" class="px-3 py-2 text-xs sm:text-sm font-medium rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition-all border border-slate-600 flex items-center gap-1.5" title="사용 이력 로그">
+        <i class="fa-solid fa-clock-rotate-left"></i>
+        <span class="hidden md:inline">작업 로그</span>
+      </button>
+
+      <button id="soundToggleBtn" onclick="toggleSound()" class="w-9 h-9 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 border border-slate-600 flex items-center justify-center transition-all" title="효과음 켜기/끄기">
+        <i id="soundIcon" class="fa-solid fa-volume-high"></i>
+      </button>
+
+      <button onclick="clearAllDataPrompt()" class="w-9 h-9 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-rose-400 border border-slate-600 flex items-center justify-center transition-all" title="전체 데이터 초기화">
+        <i class="fa-solid fa-trash-can"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+    
+    <!-- Top Stats -->
+    <section class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div class="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4 flex items-center justify-between shadow-sm">
+        <div>
+          <p class="text-xs font-medium text-slate-400">총 관리 계정</p>
+          <h3 id="statTotal" class="text-2xl font-black text-white mt-1">0</h3>
+        </div>
+        <div class="w-11 h-11 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center text-lg">
+          <i class="fa-solid fa-server"></i>
+        </div>
+      </div>
+
+      <div class="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4 flex items-center justify-between shadow-sm">
+        <div>
+          <p class="text-xs font-medium text-slate-400">현재 사용 중 (점유)</p>
+          <div class="flex items-baseline gap-2 mt-1">
+            <h3 id="statInUse" class="text-2xl font-black text-rose-400">0</h3>
+            <span id="statOccupancyRate" class="text-xs text-rose-400/80 font-semibold">(0%)</span>
+          </div>
+        </div>
+        <div class="w-11 h-11 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center text-lg animate-pulse-subtle">
+          <i class="fa-solid fa-lock"></i>
+        </div>
+      </div>
+
+      <div class="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4 flex items-center justify-between shadow-sm">
+        <div>
+          <p class="text-xs font-medium text-slate-400">즉시 사용 가능</p>
+          <h3 id="statAvailable" class="text-2xl font-black text-emerald-400 mt-1">0</h3>
+        </div>
+        <div class="w-11 h-11 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center text-lg">
+          <i class="fa-solid fa-circle-check"></i>
+        </div>
+      </div>
+
+      <div class="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4 flex items-center justify-between shadow-sm">
+        <div>
+          <p class="text-xs font-medium text-slate-400">점검 / 대기 상태</p>
+          <h3 id="statIdle" class="text-2xl font-black text-amber-400 mt-1">0</h3>
+        </div>
+        <div class="w-11 h-11 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center text-lg">
+          <i class="fa-solid fa-wrench"></i>
+        </div>
+      </div>
+    </section>
+
+    <!-- Filters & Search Bar -->
+    <section class="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-4 flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center">
+      <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
+        <button onclick="setProviderFilter('ALL')" class="filter-chip px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white transition-all shadow-sm" data-filter="ALL">전체보기</button>
+        <button onclick="setProviderFilter('AWS')" class="filter-chip px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700/80 hover:bg-slate-700 text-slate-300 transition-all" data-filter="AWS"><i class="fa-brands fa-aws text-amber-400 mr-1"></i>AWS</button>
+        <button onclick="setProviderFilter('AZURE')" class="filter-chip px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700/80 hover:bg-slate-700 text-slate-300 transition-all" data-filter="AZURE"><i class="fa-brands fa-microsoft text-sky-400 mr-1"></i>Azure</button>
+        <button onclick="setProviderFilter('OPENAI')" class="filter-chip px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700/80 hover:bg-slate-700 text-slate-300 transition-all" data-filter="OPENAI"><i class="fa-solid fa-robot text-emerald-400 mr-1"></i>OpenAI</button>
+        <button onclick="setProviderFilter('CLAUDE')" class="filter-chip px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700/80 hover:bg-slate-700 text-slate-300 transition-all" data-filter="CLAUDE"><i class="fa-solid fa-brain text-orange-400 mr-1"></i>Claude</button>
+        <button onclick="setProviderFilter('GEMINI')" class="filter-chip px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700/80 hover:bg-slate-700 text-slate-300 transition-all" data-filter="GEMINI"><i class="fa-solid fa-wand-magic-sparkles text-blue-400 mr-1"></i>AI Studio (Gemini)</button>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <select id="statusFilter" onchange="renderAccounts()" class="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 outline-none focus:border-indigo-500 transition-all">
+          <option value="ALL">모든 상태</option>
+          <option value="IN_USE">🔴 사용 중만 (In Use)</option>
+          <option value="AVAILABLE">🟢 사용 가능만 (Available)</option>
+          <option value="MAINTENANCE">🟡 점검 중만 (Maintenance)</option>
+        </select>
+
+        <div class="relative flex-1 sm:w-56">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+          <input type="text" id="searchInput" oninput="renderAccounts()" placeholder="계정명, 사용자, MFA 검색..." class="w-full bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-lg pl-8 pr-3 py-2 outline-none focus:border-indigo-500 transition-all placeholder:text-slate-500">
+        </div>
+
+        <div class="flex bg-slate-900 border border-slate-700 rounded-lg p-0.5">
+          <button id="viewGridBtn" onclick="setViewMode('grid')" class="px-2.5 py-1.5 text-xs rounded-md bg-slate-700 text-indigo-300 font-medium transition-all" title="카드 그리드 뷰">
+            <i class="fa-solid fa-grip"></i>
+          </button>
+          <button id="viewTableBtn" onclick="setViewMode('table')" class="px-2.5 py-1.5 text-xs rounded-md text-slate-400 hover:text-slate-200 transition-all" title="리스트 테이블 뷰">
+            <i class="fa-solid fa-list"></i>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Cards Grid -->
+    <div id="accountCardsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+
+    <!-- Table View -->
+    <div id="accountTableContainer" class="hidden bg-slate-800/80 border border-slate-700/80 rounded-2xl overflow-hidden shadow-sm">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs sm:text-sm text-slate-300">
+          <thead class="bg-slate-900/60 border-b border-slate-700 text-slate-400 uppercase text-[11px] tracking-wider">
+            <tr>
+              <th scope="col" class="px-4 py-3">클라우드 / 계정명</th>
+              <th scope="col" class="px-4 py-3">비밀번호</th>
+              <th scope="col" class="px-4 py-3">연동 MFA 정보</th>
+              <th scope="col" class="px-4 py-3">현재 상태</th>
+              <th scope="col" class="px-4 py-3">점유자 / 목적</th>
+              <th scope="col" class="px-4 py-3">사용 기간 및 잔여</th>
+              <th scope="col" class="px-4 py-3 text-right">제어 동작</th>
+            </tr>
+          </thead>
+          <tbody id="accountTableBody" class="divide-y divide-slate-700/50"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="hidden text-center py-16 px-4 bg-slate-800/40 rounded-2xl border border-dashed border-slate-700">
+      <div class="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto text-2xl mb-4 shadow-inner">
+        <i class="fa-solid fa-cloud-arrow-up"></i>
+      </div>
+      <h3 id="emptyStateTitle" class="text-base font-semibold text-slate-200">등록된 클라우드 계정이 없습니다</h3>
+      <p id="emptyStateDesc" class="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+        우측 상단의 <b>[+ 계정 추가]</b> 버튼을 눌러 관리할 AWS, Azure, OpenAI, Claude, AI Studio 계정을 추가해보세요.
+      </p>
+      <div class="mt-5">
+        <button onclick="openAddAccountModal()" class="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 inline-flex items-center gap-2">
+          <i class="fa-solid fa-plus"></i> 새 클라우드 계정 등록하기
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="mt-auto border-t border-slate-800 bg-slate-900/80 px-4 lg:px-8 py-3 text-xs text-slate-400 flex flex-col sm:flex-row justify-between items-center gap-2">
+    <div class="flex items-center gap-2">
+      <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+      <span>실시간 상태 모니터링 활성화됨 (1초 간격 갱신)</span>
+    </div>
+    <div class="flex items-center gap-4">
+      <span>브라우저 로컬 저장소 자동 동기화</span>
+      <span class="text-slate-500">|</span>
+      <span>CloudSeat v2.5</span>
+    </div>
+  </footer>
+
+  <!-- Modal: 계정 사용 시작 (점유) -->
+  <div id="checkoutModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-700">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-rose-500/20 text-rose-400 flex items-center justify-center font-bold">
+            <i class="fa-solid fa-lock"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white">계정 사용 시작 (점유하기)</h3>
+            <p id="modalAccountName" class="text-xs text-slate-400 font-mono">AWS Account</p>
+          </div>
+        </div>
+        <button onclick="closeModal('checkoutModal')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="checkoutForm" onsubmit="handleCheckoutSubmit(event)" class="space-y-4 text-xs">
+        <input type="hidden" id="checkoutAccountId">
+        
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">사용자 이름 / 담당자 <span class="text-rose-400">*</span></label>
+          <input type="text" id="checkoutUser" required placeholder="예: 홍길동 (개발팀)" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-slate-200 outline-none focus:border-indigo-500 transition-all">
+        </div>
+
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">작업 목적 / 이슈 티켓</label>
+          <input type="text" id="checkoutPurpose" placeholder="예: [PROJ-1024] 모델 검증 및 배포 작업" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-slate-200 outline-none focus:border-indigo-500 transition-all">
+        </div>
+
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">사용 기간 설정 (몇일부터 몇일까지) <span class="text-rose-400">*</span></label>
+          <div class="grid grid-cols-4 gap-2 mb-2.5">
+            <button type="button" onclick="setDatePreset(0)" class="preset-btn py-1.5 rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-700 text-slate-300 text-center font-medium">당일 (오늘)</button>
+            <button type="button" onclick="setDatePreset(2)" class="preset-btn py-1.5 rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-700 text-slate-300 text-center font-medium">3일간</button>
+            <button type="button" onclick="setDatePreset(6)" class="preset-btn py-1.5 rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-700 text-slate-300 text-center font-medium">1주일</button>
+            <button type="button" onclick="setDatePreset(13)" class="preset-btn py-1.5 rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-700 text-slate-300 text-center font-medium">2주일</button>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <span class="block text-[11px] text-slate-400 mb-1">시작일</span>
+              <input type="date" id="checkoutStartDate" required onchange="calculateDurationSummary()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 outline-none focus:border-indigo-500">
+            </div>
+            <div>
+              <span class="block text-[11px] text-slate-400 mb-1">종료일</span>
+              <input type="date" id="checkoutEndDate" required onchange="calculateDurationSummary()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 outline-none focus:border-indigo-500">
+            </div>
+          </div>
+          <p id="durationSummaryText" class="mt-2 text-indigo-300 font-medium text-[11px] bg-indigo-500/10 px-2.5 py-1.5 rounded-lg border border-indigo-500/20">
+            총 사용 기간: 계산 중...
+          </p>
+        </div>
+
+        <div class="pt-2 flex justify-end gap-2">
+          <button type="button" onclick="closeModal('checkoutModal')" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 font-medium">취소</button>
+          <button type="submit" class="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-medium shadow-lg shadow-rose-600/30">점유 시작</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: 점유 정보 수정 -->
+  <div id="editOccupancyModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-700">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold">
+            <i class="fa-solid fa-pen-to-square"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white">점유 정보 수정</h3>
+            <p id="editOccupancyAccountName" class="text-xs text-slate-400 font-mono">AWS Account</p>
+          </div>
+        </div>
+        <button onclick="closeModal('editOccupancyModal')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="editOccupancyForm" onsubmit="handleEditOccupancySubmit(event)" class="space-y-4 text-xs">
+        <input type="hidden" id="editOccupancyAccountId">
+        
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">사용자 이름 / 담당자 <span class="text-rose-400">*</span></label>
+          <input type="text" id="editOccupancyUser" required placeholder="예: 홍길동 (개발팀)" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-slate-200 outline-none focus:border-indigo-500 transition-all">
+        </div>
+
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">작업 목적 / 이슈 티켓</label>
+          <input type="text" id="editOccupancyPurpose" placeholder="예: [PROJ-1024] 모델 검증 및 배포 작업" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-slate-200 outline-none focus:border-indigo-500 transition-all">
+        </div>
+
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">사용 기간 변경 <span class="text-rose-400">*</span></label>
+          <div class="grid grid-cols-4 gap-2 mb-2.5">
+            <button type="button" onclick="setEditDatePreset(0)" class="preset-btn py-1.5 rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-700 text-slate-300 text-center font-medium">당일 (오늘)</button>
+            <button type="button" onclick="setEditDatePreset(2)" class="preset-btn py-1.5 rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-700 text-slate-300 text-center font-medium">3일간</button>
+            <button type="button" onclick="setEditDatePreset(6)" class="preset-btn py-1.5 rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-700 text-slate-300 text-center font-medium">1주일</button>
+            <button type="button" onclick="setEditDatePreset(13)" class="preset-btn py-1.5 rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-700 text-slate-300 text-center font-medium">2주일</button>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <span class="block text-[11px] text-slate-400 mb-1">시작일</span>
+              <input type="date" id="editOccupancyStartDate" required onchange="calculateEditDurationSummary()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 outline-none focus:border-indigo-500">
+            </div>
+            <div>
+              <span class="block text-[11px] text-slate-400 mb-1">종료일</span>
+              <input type="date" id="editOccupancyEndDate" required onchange="calculateEditDurationSummary()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 outline-none focus:border-indigo-500">
+            </div>
+          </div>
+          <p id="editDurationSummaryText" class="mt-2 text-indigo-300 font-medium text-[11px] bg-indigo-500/10 px-2.5 py-1.5 rounded-lg border border-indigo-500/20">
+            총 사용 기간: 계산 중...
+          </p>
+        </div>
+
+        <div class="pt-2 flex justify-end gap-2">
+          <button type="button" onclick="closeModal('editOccupancyModal')" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 font-medium">취소</button>
+          <button type="submit" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-medium shadow-lg shadow-indigo-600/30">수정사항 저장</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: 새 클라우드 계정 등록 / 계정 정보 수정 -->
+  <div id="accountModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-700">
+        <h3 id="accountModalTitle" class="text-base font-bold text-white">새 클라우드 계정 등록</h3>
+        <button onclick="closeModal('accountModal')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="accountForm" onsubmit="handleAccountFormSubmit(event)" class="space-y-4 text-xs">
+        <input type="hidden" id="editAccountId">
+        
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">클라우드 / AI 제공자 <span class="text-rose-400">*</span></label>
+          <select id="accProvider" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-slate-200 outline-none focus:border-indigo-500">
+            <option value="AWS">AWS (Amazon Web Services)</option>
+            <option value="AZURE">Azure (Microsoft Azure)</option>
+            <option value="OPENAI">OpenAI (ChatGPT / API)</option>
+            <option value="CLAUDE">Claude (Anthropic)</option>
+            <option value="GEMINI">AI Studio (Gemini)</option>
+            <option value="OTHER">기타 (Other Cloud)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">계정 별칭 / 이름 <span class="text-rose-400">*</span></label>
+          <input type="text" id="accName" required placeholder="예: OpenAI Team #1 (GPT-4o 전용)" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 outline-none focus:border-indigo-500">
+        </div>
+
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">계정 비밀번호</label>
+          <div class="relative">
+            <input type="text" id="accPassword" placeholder="예: P@ssw0rd123! 또는 비밀번호 가이드" class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-3 pr-8 py-2 text-slate-200 outline-none focus:border-indigo-500 font-mono">
+            <i class="fa-solid fa-key absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">연동 MFA 정보</label>
+          <textarea id="accMfa" rows="2" placeholder="예: 구글 OTP (김팀장 폰 연동) 또는 010-XXXX-XXXX 번호로 SMS 전송" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-200 outline-none focus:border-indigo-500"></textarea>
+        </div>
+
+        <div class="pt-2 flex justify-end gap-2">
+          <button type="button" onclick="closeModal('accountModal')" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 font-medium">취소</button>
+          <button type="submit" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-medium shadow-lg shadow-indigo-600/30">저장하기</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: 작업 로그 -->
+  <div id="logsModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-700">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-clock-rotate-left text-indigo-400"></i>
+          <h3 class="text-base font-bold text-white">작업 및 점유 감사 로그 (Audit History)</h3>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="clearAuditLogs()" class="text-xs text-rose-400 hover:text-rose-300 px-2 py-1 rounded bg-rose-500/10 border border-rose-500/20">로그 비우기</button>
+          <button onclick="closeModal('logsModal')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+            <i class="fa-solid fa-xmark text-lg"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-y-auto space-y-2 pr-1" id="logsListContainer"></div>
+    </div>
+  </div>
+
+  <!-- Toast 알림 -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border text-sm font-medium">
+    <i id="toastIcon" class="fa-solid fa-circle-check text-lg"></i>
+    <span id="toastMessage">알림</span>
+  </div>
+
+  <!-- Modal: 확인 다이얼로그 -->
+  <div id="confirmModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
+      <div class="flex items-start gap-3">
+        <div class="w-10 h-10 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center shrink-0 text-lg">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div>
+          <h4 id="confirmTitle" class="text-sm font-bold text-white">확인</h4>
+          <p id="confirmText" class="text-xs text-slate-300 mt-1">작업을 계속하시겠습니까?</p>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button id="confirmCancelBtn" class="px-3.5 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium">취소</button>
+        <button id="confirmOkBtn" class="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium shadow-md">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript Logic -->
+  <script>
+    let accounts = [];
+    let auditLogs = [];
+    let currentProviderFilter = 'ALL';
+    let currentViewMode = 'grid';
+    let soundEnabled = true;
+    let synth = null;
+
+    // 비밀번호 마스킹 가시성 토글 상태 보관 객체
+    const pwVisibilityMap = {};
+
+    function initApp() {
+      const savedAccounts = localStorage.getItem('cloudseat_accounts');
+      if (savedAccounts) {
+        try {
+          accounts = JSON.parse(savedAccounts);
+          // 구버전 필드 마이그레이션 호환 처리
+          accounts.forEach(acc => {
+            if (acc.password === undefined && acc.identifier !== undefined) {
+              acc.password = acc.identifier;
+            }
+            if (acc.mfa === undefined && acc.notes !== undefined) {
+              acc.mfa = acc.notes;
+            }
+          });
+        } catch (e) {
+          accounts = [];
+        }
+      } else {
+        accounts = [];
+      }
+
+      const savedLogs = localStorage.getItem('cloudseat_logs');
+      if (savedLogs) {
+        try {
+          auditLogs = JSON.parse(savedLogs);
+        } catch (e) {
+          auditLogs = [];
+        }
+      } else {
+        auditLogs = [];
+      }
+
+      try {
+        synth = new Tone.PolySynth(Tone.Synth).toDestination();
+        synth.volume.value = -12;
+      } catch (e) {}
+
+      renderAccounts();
+      renderStats();
+      setInterval(tick, 1000);
+    }
+
+    function saveAccounts() {
+      localStorage.setItem('cloudseat_accounts', JSON.stringify(accounts));
+      renderStats();
+    }
+
+    function saveLogs() {
+      localStorage.setItem('cloudseat_logs', JSON.stringify(auditLogs));
+    }
+
+    function addAuditLog(action, userName, accountName, details) {
+      const log = {
+        id: 'log-' + Date.now(),
+        timestamp: new Date().toISOString(),
+        action: action,
+        userName: userName,
+        accountName: accountName,
+        details: details
+      };
+      auditLogs.unshift(log);
+      if (auditLogs.length > 150) auditLogs.pop();
+      saveLogs();
+    }
+
+    function playChime(type) {
+      if (!soundEnabled) return;
+      try {
+        if (Tone.context.state !== 'running') {
+          Tone.start();
+        }
+        if (!synth) {
+          synth = new Tone.PolySynth(Tone.Synth).toDestination();
+          synth.volume.value = -12;
+        }
+        const now = Tone.now();
+        if (type === 'checkout') {
+          synth.triggerAttackRelease(['C5', 'E5', 'G5'], '16n', now);
+        } else if (type === 'release') {
+          synth.triggerAttackRelease(['G5', 'E5', 'C5'], '16n', now);
+        } else if (type === 'copy') {
+          synth.triggerAttackRelease(['A5'], '32n', now);
+        } else if (type === 'warning') {
+          synth.triggerAttackRelease(['F#5', 'F#5'], '16n', now);
+        }
+      } catch (err) {}
+    }
+
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      const icon = document.getElementById('soundIcon');
+      if (soundEnabled) {
+        icon.className = 'fa-solid fa-volume-high text-indigo-400';
+        showToast('효과음이 켜졌습니다.', 'info');
+      } else {
+        icon.className = 'fa-solid fa-volume-xmark text-slate-400';
+        showToast('효과음이 꺼졌습니다.', 'info');
+      }
+    }
+
+    function togglePasswordVisibility(accId) {
+      pwVisibilityMap[accId] = !pwVisibilityMap[accId];
+      renderAccounts();
+    }
+
+    function renderAccounts() {
+      const query = document.getElementById('searchInput').value.trim().toLowerCase();
+      const statusFilter = document.getElementById('statusFilter').value;
+      const cardContainer = document.getElementById('accountCardsContainer');
+      const tableBody = document.getElementById('accountTableBody');
+      const emptyState = document.getElementById('emptyState');
+      const emptyTitle = document.getElementById('emptyStateTitle');
+      const emptyDesc = document.getElementById('emptyStateDesc');
+
+      const filtered = accounts.filter(acc => {
+        if (currentProviderFilter !== 'ALL' && acc.provider !== currentProviderFilter) return false;
+        if (statusFilter !== 'ALL' && acc.status !== statusFilter) return false;
+
+        if (query) {
+          const matchName = (acc.name || '').toLowerCase().includes(query);
+          const matchUser = (acc.currentUser || '').toLowerCase().includes(query);
+          const matchMfa = (acc.mfa || '').toLowerCase().includes(query);
+          const matchPw = (acc.password || '').toLowerCase().includes(query);
+          if (!matchName && !matchUser && !matchMfa && !matchPw) return false;
+        }
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        cardContainer.innerHTML = '';
+        tableBody.innerHTML = '';
+        emptyState.classList.remove('hidden');
+
+        if (accounts.length === 0) {
+          emptyTitle.innerText = '등록된 클라우드 계정이 없습니다';
+          emptyDesc.innerHTML = '우측 상단의 <b>[+ 계정 추가]</b> 버튼을 눌러 계정을 등록해보세요.';
+        } else {
+          emptyTitle.innerText = '검색 조건과 일치하는 계정이 없습니다';
+          emptyDesc.innerText = '필터 또는 검색어를 변경해보세요.';
+        }
+        return;
+      }
+      emptyState.classList.add('hidden');
+
+      cardContainer.innerHTML = filtered.map(acc => createAccountCardHTML(acc)).join('');
+      tableBody.innerHTML = filtered.map(acc => createAccountTableRowHTML(acc)).join('');
+    }
+
+    function getProviderMeta(provider) {
+      switch (provider) {
+        case 'AWS':
+          return { icon: 'fa-brands fa-aws', color: 'text-amber-400', bg: 'bg-amber-400/10', border: 'border-amber-400/30', label: 'AWS' };
+        case 'AZURE':
+          return { icon: 'fa-brands fa-microsoft', color: 'text-sky-400', bg: 'bg-sky-400/10', border: 'border-sky-400/30', label: 'Azure' };
+        case 'OPENAI':
+          return { icon: 'fa-solid fa-robot', color: 'text-emerald-400', bg: 'bg-emerald-400/10', border: 'border-emerald-400/30', label: 'OpenAI' };
+        case 'CLAUDE':
+          return { icon: 'fa-solid fa-brain', color: 'text-orange-400', bg: 'bg-orange-400/10', border: 'border-orange-400/30', label: 'Claude' };
+        case 'GEMINI':
+          return { icon: 'fa-solid fa-wand-magic-sparkles', color: 'text-blue-400', bg: 'bg-blue-400/10', border: 'border-blue-400/30', label: 'AI Studio (Gemini)' };
+        default:
+          return { icon: 'fa-solid fa-cloud', color: 'text-purple-400', bg: 'bg-purple-400/10', border: 'border-purple-400/30', label: '기타' };
+      }
+    }
+
+    function createAccountCardHTML(acc) {
+      const pMeta = getProviderMeta(acc.provider);
+      let statusBadge = '';
+      let actionButtons = '';
+      let occupancyDetails = '';
+
+      const isPwVisible = !!pwVisibilityMap[acc.id];
+      const rawPw = acc.password || '';
+      const displayPw = rawPw ? (isPwVisible ? rawPw : '••••••••••••') : '비밀번호 미설정';
+
+      if (acc.status === 'IN_USE') {
+        const remainingMs = Math.max(0, (acc.expireTimestamp || Date.now()) - Date.now());
+        const isExpiringSoon = remainingMs <= 24 * 3600 * 1000;
+
+        statusBadge = '<div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/15 border border-rose-500/40 text-rose-400 text-xs font-bold animate-pulse-subtle">' +
+          '<span class="w-2 h-2 rounded-full bg-rose-500"></span>' +
+          '<span>사용 중 (점유)</span>' +
+        '</div>';
+
+        occupancyDetails = '<div class="mt-3.5 p-3 rounded-xl bg-slate-900/80 border border-slate-700/80 space-y-2">' +
+          '<div class="flex items-center justify-between text-xs">' +
+            '<span class="text-slate-400 font-medium"><i class="fa-solid fa-user-tag mr-1 text-slate-500"></i>점유자:</span>' +
+            '<span class="text-rose-300 font-semibold truncate max-w-[170px]">' + escapeHTML(acc.currentUser || '담당자') + '</span>' +
+          '</div>' +
+          (acc.purpose ? (
+            '<div class="flex items-start justify-between text-xs gap-2">' +
+              '<span class="text-slate-400 font-medium shrink-0"><i class="fa-solid fa-clipboard-list mr-1 text-slate-500"></i>목적:</span>' +
+              '<span class="text-slate-300 text-right truncate" title="' + escapeHTML(acc.purpose) + '">' + escapeHTML(acc.purpose) + '</span>' +
+            '</div>'
+          ) : '') +
+          '<div class="flex items-center justify-between text-xs pt-1 border-t border-slate-800">' +
+            '<span class="text-slate-400"><i class="fa-regular fa-calendar-days mr-1 text-slate-500"></i>사용 기간:</span>' +
+            '<span class="font-mono text-slate-300 text-[11px]">' + escapeHTML(acc.startDate || '') + ' ~ ' + escapeHTML(acc.endDate || '') + '</span>' +
+          '</div>' +
+          '<div class="flex items-center justify-between text-xs">' +
+            '<span class="text-slate-400"><i class="fa-regular fa-clock mr-1 text-slate-500"></i>잔여 시간:</span>' +
+            '<span class="font-mono font-bold ' + (isExpiringSoon ? 'text-amber-400 animate-pulse' : 'text-emerald-400') + '" id="timer-' + acc.id + '">' +
+              formatCountdown(acc.expireTimestamp) +
+            '</span>' +
+          '</div>' +
+        '</div>';
+
+        actionButtons = '<button onclick="releaseAccount(\'' + acc.id + '\')" class="flex-1 py-2 px-3 rounded-xl bg-slate-700 hover:bg-emerald-600/90 text-white text-xs font-semibold transition-all border border-slate-600 flex items-center justify-center gap-1.5 active:scale-95 shadow-sm">' +
+            '<i class="fa-solid fa-arrow-rotate-left"></i> 반납하기' +
+          '</button>' +
+          '<button onclick="openEditOccupancyModal(\'' + acc.id + '\')" class="py-2 px-3 rounded-xl bg-indigo-600/80 hover:bg-indigo-600 text-white text-xs font-semibold transition-all border border-indigo-500/40 flex items-center justify-center gap-1" title="점유 정보 수정">' +
+            '<i class="fa-solid fa-pen"></i> 수정' +
+          '</button>' +
+          '<button onclick="extendAccount(\'' + acc.id + '\')" class="py-2 px-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-semibold transition-all border border-slate-600 flex items-center justify-center gap-1" title="종료일 1일 연장">' +
+            '<i class="fa-solid fa-plus"></i> +1일' +
+          '</button>';
+      } else if (acc.status === 'AVAILABLE') {
+        statusBadge = '<div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold">' +
+            '<span class="w-2 h-2 rounded-full bg-emerald-400"></span>' +
+            '<span>즉시 사용 가능</span>' +
+          '</div>';
+
+        occupancyDetails = '<div class="mt-3.5 p-3 rounded-xl bg-slate-900/40 border border-dashed border-slate-700/60 flex items-center justify-center text-xs text-slate-400 py-6">' +
+            '<i class="fa-regular fa-circle-check mr-1.5 text-emerald-400"></i> 현재 유휴 상태 (바로 점유 가능)' +
+          '</div>';
+
+        actionButtons = '<button onclick="openCheckoutModal(\'' + acc.id + '\')" class="flex-1 py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-semibold transition-all shadow-md shadow-indigo-600/20 flex items-center justify-center gap-1.5">' +
+            '<i class="fa-solid fa-right-to-bracket"></i> 사용 시작 (점유)' +
+          '</button>' +
+          '<button onclick="toggleMaintenance(\'' + acc.id + '\')" class="py-2 px-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-semibold transition-all border border-slate-600" title="점검 모드로 전환">' +
+            '<i class="fa-solid fa-wrench"></i>' +
+          '</button>';
+      } else {
+        statusBadge = '<div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-bold">' +
+            '<i class="fa-solid fa-wrench text-[10px]"></i>' +
+            '<span>점검 중</span>' +
+          '</div>';
+
+        occupancyDetails = '<div class="mt-3.5 p-3 rounded-xl bg-amber-500/5 border border-amber-500/20 flex items-center justify-center text-xs text-amber-300/80 py-6">' +
+            '<i class="fa-solid fa-shield-halved mr-1.5"></i> 관리자에 의해 시스템 점검 중' +
+          '</div>';
+
+        actionButtons = '<button onclick="toggleMaintenance(\'' + acc.id + '\')" class="flex-1 py-2 px-3 rounded-xl bg-amber-600/80 hover:bg-amber-600 active:scale-95 text-white text-xs font-semibold transition-all flex items-center justify-center gap-1.5">' +
+            '<i class="fa-solid fa-circle-check"></i> 점검 완료 (활성화)' +
+          '</button>';
+      }
+
+      return '<div class="bg-slate-800/90 border border-slate-700/80 hover:border-slate-600 transition-all rounded-2xl p-5 flex flex-col justify-between shadow-sm relative group">' +
+          '<div>' +
+            '<div class="flex items-center justify-between gap-2">' +
+              '<div class="flex items-center gap-2">' +
+                '<div class="w-8 h-8 rounded-lg ' + pMeta.bg + ' ' + pMeta.color + ' border ' + pMeta.border + ' flex items-center justify-center text-sm font-bold">' +
+                  '<i class="' + pMeta.icon + '"></i>' +
+                '</div>' +
+                '<div>' +
+                  '<span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">' + pMeta.label + '</span>' +
+                '</div>' +
+              '</div>' +
+              '<div>' + statusBadge + '</div>' +
+            '</div>' +
+            
+            '<div class="mt-3">' +
+              '<h4 class="text-sm sm:text-base font-bold text-white group-hover:text-indigo-300 transition-colors truncate" title="' + escapeHTML(acc.name) + '">' +
+                escapeHTML(acc.name) +
+              '</h4>' +
+              
+              /* 비밀번호란 */
+              '<div class="flex items-center gap-2 mt-2 bg-slate-900/60 px-2.5 py-1.5 rounded-lg border border-slate-700/60">' +
+                '<span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0"><i class="fa-solid fa-key mr-1 text-slate-500"></i>PW:</span>' +
+                '<span class="text-xs font-mono text-slate-200 truncate flex-1 ' + (isPwVisible ? 'select-all' : '') + '">' + escapeHTML(displayPw) + '</span>' +
+                (rawPw ? (
+                  '<div class="flex items-center gap-1 shrink-0">' +
+                    '<button onclick="togglePasswordVisibility(\'' + acc.id + '\')" class="text-slate-400 hover:text-white p-1 text-xs" title="' + (isPwVisible ? '비밀번호 숨기기' : '비밀번호 보기') + '">' +
+                      '<i class="fa-solid ' + (isPwVisible ? 'fa-eye-slash text-indigo-400' : 'fa-eye') + '"></i>' +
+                    '</button>' +
+                    '<button onclick="copyToClipboard(\'' + escapeHTML(rawPw) + '\', \'비밀번호가 복사되었습니다\')" class="text-slate-400 hover:text-emerald-400 p-1 text-xs" title="비밀번호 복사">' +
+                      '<i class="fa-regular fa-copy"></i>' +
+                    '</button>' +
+                  '</div>'
+                ) : '') +
+              '</div>' +
+            '</div>' +
+
+            /* 연동 MFA 정보 */
+            (acc.mfa ? (
+              '<div class="mt-2 p-2 rounded-lg bg-indigo-500/5 border border-indigo-500/20 text-[11px] text-indigo-300/90 flex items-start gap-1.5">' +
+                '<i class="fa-solid fa-shield-halved text-indigo-400 mt-0.5 shrink-0"></i>' +
+                '<span class="truncate" title="' + escapeHTML(acc.mfa) + '"><b>MFA:</b> ' + escapeHTML(acc.mfa) + '</span>' +
+              '</div>'
+            ) : '') +
+
+            occupancyDetails +
+          '</div>' +
+          '<div class="mt-4 pt-3 border-t border-slate-700/60">' +
+            '<div class="flex items-center justify-end gap-1 mb-3">' +
+              '<button onclick="openEditAccountModal(\'' + acc.id + '\')" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-700" title="계정 수정"><i class="fa-solid fa-pen-to-square text-xs"></i></button>' +
+              '<button onclick="deleteAccountPrompt(\'' + acc.id + '\')" class="text-slate-500 hover:text-rose-400 p-1 rounded hover:bg-slate-700" title="계정 삭제"><i class="fa-solid fa-trash-can text-xs"></i></button>' +
+            '</div>' +
+            '<div class="flex items-center gap-2">' + actionButtons + '</div>' +
+          '</div>' +
+        '</div>';
+    }
+
+    function createAccountTableRowHTML(acc) {
+      const pMeta = getProviderMeta(acc.provider);
+      let statusBadge = '';
+      let timerCell = '-';
+      let actionsCell = '';
+
+      const isPwVisible = !!pwVisibilityMap[acc.id];
+      const rawPw = acc.password || '';
+      const displayPw = rawPw ? (isPwVisible ? rawPw : '••••••••••••') : '-';
+
+      if (acc.status === 'IN_USE') {
+        statusBadge = '<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">사용 중</span>';
+        timerCell = '<div><span class="text-xs text-slate-300 block font-mono">' + escapeHTML(acc.startDate || '') + ' ~ ' + escapeHTML(acc.endDate || '') + '</span>' +
+          '<span class="font-mono font-bold text-rose-300 text-xs" id="timer-tbl-' + acc.id + '">' + formatCountdown(acc.expireTimestamp) + '</span></div>';
+        actionsCell = '<div class="flex items-center justify-end gap-1.5">' +
+          '<button onclick="releaseAccount(\'' + acc.id + '\')" class="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium">반납</button>' +
+          '<button onclick="openEditOccupancyModal(\'' + acc.id + '\')" class="px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium" title="점유 정보 수정">수정</button>' +
+          '<button onclick="extendAccount(\'' + acc.id + '\')" class="px-2.5 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium">+1일</button>' +
+        '</div>';
+      } else if (acc.status === 'AVAILABLE') {
+        statusBadge = '<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">사용 가능</span>';
+        actionsCell = '<div class="flex items-center justify-end gap-1.5">' +
+          '<button onclick="openCheckoutModal(\'' + acc.id + '\')" class="px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium">점유하기</button>' +
+          '<button onclick="openEditAccountModal(\'' + acc.id + '\')" class="p-1 text-slate-400 hover:text-white"><i class="fa-solid fa-pen-to-square"></i></button>' +
+        '</div>';
+      } else {
+        statusBadge = '<span class="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">점검 중</span>';
+        actionsCell = '<div class="flex items-center justify-end gap-1.5">' +
+          '<button onclick="toggleMaintenance(\'' + acc.id + '\')" class="px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium">점검 해제</button>' +
+        '</div>';
+      }
+
+      return '<tr class="hover:bg-slate-800/60 transition-colors">' +
+        '<td class="px-4 py-3">' +
+          '<div class="flex items-center gap-2.5">' +
+            '<div class="w-6 h-6 rounded ' + pMeta.bg + ' ' + pMeta.color + ' flex items-center justify-center text-xs font-bold"><i class="' + pMeta.icon + '"></i></div>' +
+            '<div><span class="font-bold text-white block">' + escapeHTML(acc.name) + '</span></div>' +
+          '</div>' +
+        '</td>' +
+        '<td class="px-4 py-3">' +
+          '<div class="flex items-center gap-1.5 font-mono text-xs">' +
+            '<span class="text-slate-300">' + escapeHTML(displayPw) + '</span>' +
+            (rawPw ? (
+              '<button onclick="togglePasswordVisibility(\'' + acc.id + '\')" class="text-slate-500 hover:text-white p-0.5">' +
+                '<i class="fa-solid ' + (isPwVisible ? 'fa-eye-slash' : 'fa-eye') + '"></i>' +
+              '</button>' +
+              '<button onclick="copyToClipboard(\'' + escapeHTML(rawPw) + '\', \'비밀번호가 복사되었습니다\')" class="text-slate-500 hover:text-emerald-400 p-0.5">' +
+                '<i class="fa-regular fa-copy"></i>' +
+              '</button>'
+            ) : '') +
+          '</div>' +
+        '</td>' +
+        '<td class="px-4 py-3"><span class="text-slate-300 text-xs truncate max-w-[180px] block" title="' + escapeHTML(acc.mfa || '-') + '">' + escapeHTML(acc.mfa || '-') + '</span></td>' +
+        '<td class="px-4 py-3">' + statusBadge + '</td>' +
+        '<td class="px-4 py-3">' + (acc.currentUser ? '<span class="text-rose-300 font-medium block">' + escapeHTML(acc.currentUser) + '</span><span class="text-slate-400 text-xs truncate max-w-[140px] inline-block">' + escapeHTML(acc.purpose || '') + '</span>' : '<span class="text-slate-500">-</span>') + '</td>' +
+        '<td class="px-4 py-3">' + timerCell + '</td>' +
+        '<td class="px-4 py-3 text-right">' + actionsCell + '</td>' +
+      '</tr>';
+    }
+
+    function tick() {
+      const now = Date.now();
+      accounts.forEach(acc => {
+        if (acc.status === 'IN_USE' && acc.expireTimestamp) {
+          const diff = acc.expireTimestamp - now;
+          const timerEl = document.getElementById('timer-' + acc.id);
+          const tblTimerEl = document.getElementById('timer-tbl-' + acc.id);
+
+          if (diff <= 0) {
+            if (timerEl) timerEl.innerText = '기간 만료 (반납 필요)';
+            if (tblTimerEl) tblTimerEl.innerText = '기간 만료';
+            if (!acc.notifiedExpired) {
+              acc.notifiedExpired = true;
+              playChime('warning');
+              showToast('[' + acc.name + '] 설정된 사용 기간이 종료되었습니다. 반납해 주세요.', 'warning');
+            }
+          } else {
+            const formatted = formatCountdown(acc.expireTimestamp);
+            if (timerEl) timerEl.innerText = formatted;
+            if (tblTimerEl) tblTimerEl.innerText = formatted;
+          }
+        }
+      });
+    }
+
+    function formatCountdown(expireTimestamp) {
+      if (!expireTimestamp) return '종료됨';
+      const remaining = Math.max(0, expireTimestamp - Date.now());
+      const totalSec = Math.floor(remaining / 1000);
+      const days = Math.floor(totalSec / 86400);
+      const hours = Math.floor((totalSec % 86400) / 3600);
+      const mins = Math.floor((totalSec % 3600) / 60);
+      const secs = totalSec % 60;
+
+      if (days > 0) {
+        return days + '일 ' + String(hours).padStart(2, '0') + '시간 남음';
+      }
+      return String(hours).padStart(2, '0') + ':' + String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+    }
+
+    function formatDateToYYYYMMDD(d) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return year + '-' + month + '-' + day;
+    }
+
+    function setDatePreset(offsetDays) {
+      const start = new Date();
+      const end = new Date();
+      end.setDate(start.getDate() + offsetDays);
+
+      document.getElementById('checkoutStartDate').value = formatDateToYYYYMMDD(start);
+      document.getElementById('checkoutEndDate').value = formatDateToYYYYMMDD(end);
+      calculateDurationSummary();
+    }
+
+    function calculateDurationSummary() {
+      const startVal = document.getElementById('checkoutStartDate').value;
+      const endVal = document.getElementById('checkoutEndDate').value;
+      const summaryEl = document.getElementById('durationSummaryText');
+
+      if (!startVal || !endVal) {
+        summaryEl.innerText = '시작일과 종료일을 입력해주세요.';
+        return;
+      }
+
+      const sDate = new Date(startVal + 'T00:00:00');
+      const eDate = new Date(endVal + 'T23:59:59');
+
+      if (eDate < sDate) {
+        summaryEl.innerHTML = '<span class="text-rose-400 font-semibold">⚠️ 종료일이 시작일보다 빠를 수 없습니다.</span>';
+        return;
+      }
+
+      const diffDays = Math.round((eDate - sDate) / (1000 * 60 * 60 * 24));
+      summaryEl.innerHTML = '총 <b>' + diffDays + '일간</b> 사용 (' + startVal + ' ~ ' + endVal + ' 23:59까지)';
+    }
+
+    function openCheckoutModal(accId) {
+      const acc = accounts.find(a => a.id === accId);
+      if (!acc) return;
+
+      document.getElementById('checkoutAccountId').value = acc.id;
+      document.getElementById('modalAccountName').innerText = acc.provider + ' - ' + acc.name;
+      document.getElementById('checkoutUser').value = '';
+      document.getElementById('checkoutPurpose').value = '';
+
+      setDatePreset(0);
+      openModal('checkoutModal');
+    }
+
+    function handleCheckoutSubmit(e) {
+      e.preventDefault();
+      const id = document.getElementById('checkoutAccountId').value;
+      const user = document.getElementById('checkoutUser').value.trim();
+      const purpose = document.getElementById('checkoutPurpose').value.trim();
+      const startDate = document.getElementById('checkoutStartDate').value;
+      const endDate = document.getElementById('checkoutEndDate').value;
+
+      if (!startDate || !endDate) {
+        showToast('시작일과 종료일을 올바르게 선택해주세요.', 'warning');
+        return;
+      }
+
+      const sDate = new Date(startDate + 'T00:00:00');
+      const eDate = new Date(endDate + 'T23:59:59');
+
+      if (eDate < sDate) {
+        showToast('종료일은 시작일 이후여야 합니다.', 'warning');
+        return;
+      }
+
+      const accIndex = accounts.findIndex(a => a.id === id);
+      if (accIndex === -1) return;
+
+      const acc = accounts[accIndex];
+      acc.status = 'IN_USE';
+      acc.currentUser = user;
+      acc.purpose = purpose || '작업 진행 중';
+      acc.checkoutTime = Date.now();
+      acc.startDate = startDate;
+      acc.endDate = endDate;
+      acc.expireTimestamp = eDate.getTime();
+      acc.notifiedExpired = false;
+
+      const diffDays = Math.round((eDate - sDate) / (1000 * 60 * 60 * 24));
+
+      saveAccounts();
+      addAuditLog('CHECKOUT', user, acc.name, startDate + ' ~ ' + endDate + ' (' + diffDays + '일간 점유 시작) - ' + (purpose || '목적 미기재'));
+      
+      closeModal('checkoutModal');
+      renderAccounts();
+      playChime('checkout');
+      showToast('\'' + acc.name + '\' 계정을 ' + startDate + ' ~ ' + endDate + ' 기간 동안 점유합니다.', 'success');
+    }
+
+    function openEditOccupancyModal(accId) {
+      const acc = accounts.find(a => a.id === accId);
+      if (!acc || acc.status !== 'IN_USE') return;
+
+      document.getElementById('editOccupancyAccountId').value = acc.id;
+      document.getElementById('editOccupancyAccountName').innerText = acc.provider + ' - ' + acc.name;
+      document.getElementById('editOccupancyUser').value = acc.currentUser || '';
+      document.getElementById('editOccupancyPurpose').value = acc.purpose || '';
+      document.getElementById('editOccupancyStartDate').value = acc.startDate || formatDateToYYYYMMDD(new Date());
+      document.getElementById('editOccupancyEndDate').value = acc.endDate || formatDateToYYYYMMDD(new Date());
+
+      calculateEditDurationSummary();
+      openModal('editOccupancyModal');
+    }
+
+    function setEditDatePreset(offsetDays) {
+      const start = new Date();
+      const end = new Date();
+      end.setDate(start.getDate() + offsetDays);
+
+      document.getElementById('editOccupancyStartDate').value = formatDateToYYYYMMDD(start);
+      document.getElementById('editOccupancyEndDate').value = formatDateToYYYYMMDD(end);
+      calculateEditDurationSummary();
+    }
+
+    function calculateEditDurationSummary() {
+      const startVal = document.getElementById('editOccupancyStartDate').value;
+      const endVal = document.getElementById('editOccupancyEndDate').value;
+      const summaryEl = document.getElementById('editDurationSummaryText');
+
+      if (!startVal || !endVal) {
+        summaryEl.innerText = '시작일과 종료일을 입력해주세요.';
+        return;
+      }
+
+      const sDate = new Date(startVal + 'T00:00:00');
+      const eDate = new Date(endVal + 'T23:59:59');
+
+      if (eDate < sDate) {
+        summaryEl.innerHTML = '<span class="text-rose-400 font-semibold">⚠️ 종료일이 시작일보다 빠를 수 없습니다.</span>';
+        return;
+      }
+
+      const diffDays = Math.round((eDate - sDate) / (1000 * 60 * 60 * 24));
+      summaryEl.innerHTML = '총 <b>' + diffDays + '일간</b> 사용 (' + startVal + ' ~ ' + endVal + ' 23:59까지)';
+    }
+
+    function handleEditOccupancySubmit(e) {
+      e.preventDefault();
+      const id = document.getElementById('editOccupancyAccountId').value;
+      const user = document.getElementById('editOccupancyUser').value.trim();
+      const purpose = document.getElementById('editOccupancyPurpose').value.trim();
+      const startDate = document.getElementById('editOccupancyStartDate').value;
+      const endDate = document.getElementById('editOccupancyEndDate').value;
+
+      if (!startDate || !endDate) {
+        showToast('시작일과 종료일을 올바르게 선택해주세요.', 'warning');
+        return;
+      }
+
+      const sDate = new Date(startDate + 'T00:00:00');
+      const eDate = new Date(endDate + 'T23:59:59');
+
+      if (eDate < sDate) {
+        showToast('종료일은 시작일 이후여야 합니다.', 'warning');
+        return;
+      }
+
+      const accIndex = accounts.findIndex(a => a.id === id);
+      if (accIndex === -1) return;
+
+      const acc = accounts[accIndex];
+      acc.currentUser = user;
+      acc.purpose = purpose || '작업 진행 중';
+      acc.startDate = startDate;
+      acc.endDate = endDate;
+      acc.expireTimestamp = eDate.getTime();
+      acc.notifiedExpired = false;
+
+      const diffDays = Math.round((eDate - sDate) / (1000 * 60 * 60 * 24));
+
+      saveAccounts();
+      addAuditLog('EDIT_OCCUPANCY', user, acc.name, '점유 정보 수정: ' + startDate + ' ~ ' + endDate + ' (' + diffDays + '일간) - ' + (purpose || '목적 미기재'));
+      
+      closeModal('editOccupancyModal');
+      renderAccounts();
+      playChime('checkout');
+      showToast('\'' + acc.name + '\' 계정의 점유 정보가 수정되었습니다.', 'success');
+    }
+
+    function releaseAccount(accId) {
+      const accIndex = accounts.findIndex(a => a.id === accId);
+      if (accIndex === -1) return;
+
+      const acc = accounts[accIndex];
+      const previousUser = acc.currentUser || '사용자';
+
+      openConfirmDialog(
+        '계정 반납 확인',
+        '\'' + acc.name + '\' 계정 사용을 종료하고 사용 가능 상태로 반납하시겠습니까?',
+        () => {
+          acc.status = 'AVAILABLE';
+          acc.currentUser = null;
+          acc.purpose = null;
+          acc.checkoutTime = null;
+          acc.startDate = null;
+          acc.endDate = null;
+          acc.expireTimestamp = null;
+          acc.notifiedExpired = false;
+
+          saveAccounts();
+          addAuditLog('RELEASE', previousUser, acc.name, '계정 정상 반납 완료');
+          renderAccounts();
+          playChime('release');
+          showToast('\'' + acc.name + '\' 계정이 성공적으로 반납되었습니다.', 'info');
+        }
+      );
+    }
+
+    function extendAccount(accId) {
+      const acc = accounts.find(a => a.id === accId);
+      if (!acc || acc.status !== 'IN_USE') return;
+
+      const currentExpire = acc.expireTimestamp > Date.now() ? acc.expireTimestamp : Date.now();
+      const newExpire = currentExpire + (24 * 60 * 60 * 1000);
+      acc.expireTimestamp = newExpire;
+      
+      const newEndDate = new Date(newExpire);
+      acc.endDate = formatDateToYYYYMMDD(newEndDate);
+      acc.notifiedExpired = false;
+
+      saveAccounts();
+      addAuditLog('EXTEND', acc.currentUser || '담당자', acc.name, '점유 종료일 1일 연장 (' + acc.endDate + '까지)');
+      renderAccounts();
+      playChime('checkout');
+      showToast('사용 기간이 1일 연장되었습니다. (~ ' + acc.endDate + ')', 'success');
+    }
+
+    function toggleMaintenance(accId) {
+      const acc = accounts.find(a => a.id === accId);
+      if (!acc) return;
+
+      if (acc.status === 'MAINTENANCE') {
+        acc.status = 'AVAILABLE';
+        addAuditLog('MAINTENANCE_END', '관리자', acc.name, '시스템 점검 완료 후 활성화');
+        showToast('\'' + acc.name + '\' 점검이 해제되었습니다.', 'info');
+      } else {
+        acc.status = 'MAINTENANCE';
+        acc.currentUser = null;
+        acc.expireTimestamp = null;
+        addAuditLog('MAINTENANCE_START', '관리자', acc.name, '정기 점검 모드 전환');
+        showToast('\'' + acc.name + '\' 점검 모드로 설정되었습니다.', 'warning');
+      }
+
+      saveAccounts();
+      renderAccounts();
+    }
+
+    function openAddAccountModal() {
+      document.getElementById('accountModalTitle').innerText = '새 클라우드 계정 등록';
+      document.getElementById('editAccountId').value = '';
+      document.getElementById('accProvider').value = 'AWS';
+      document.getElementById('accName').value = '';
+      document.getElementById('accPassword').value = '';
+      document.getElementById('accMfa').value = '';
+      openModal('accountModal');
+    }
+
+    function openEditAccountModal(accId) {
+      const acc = accounts.find(a => a.id === accId);
+      if (!acc) return;
+
+      document.getElementById('accountModalTitle').innerText = '클라우드 계정 정보 수정';
+      document.getElementById('editAccountId').value = acc.id;
+      document.getElementById('accProvider').value = acc.provider;
+      document.getElementById('accName').value = acc.name;
+      document.getElementById('accPassword').value = acc.password || '';
+      document.getElementById('accMfa').value = acc.mfa || '';
+
+      openModal('accountModal');
+    }
+
+    function handleAccountFormSubmit(e) {
+      e.preventDefault();
+      const editId = document.getElementById('editAccountId').value;
+      const provider = document.getElementById('accProvider').value;
+      const name = document.getElementById('accName').value.trim();
+      const password = document.getElementById('accPassword').value.trim();
+      const mfa = document.getElementById('accMfa').value.trim();
+
+      if (editId) {
+        const acc = accounts.find(a => a.id === editId);
+        if (acc) {
+          acc.provider = provider;
+          acc.name = name;
+          acc.password = password;
+          acc.mfa = mfa;
+          addAuditLog('EDIT_ACCOUNT', '관리자', name, '계정 기본 메타데이터 수정');
+          showToast('계정 정보가 업데이트되었습니다.', 'success');
+        }
+      } else {
+        const newAcc = {
+          id: 'acc-' + Date.now(),
+          provider: provider,
+          name: name,
+          password: password,
+          mfa: mfa,
+          status: 'AVAILABLE',
+          currentUser: null,
+          purpose: null,
+          checkoutTime: null,
+          expireTimestamp: null
+        };
+        accounts.unshift(newAcc);
+        addAuditLog('CREATE_ACCOUNT', '관리자', name, '신규 클라우드 계정 등록');
+        showToast('새 클라우드 계정이 등록되었습니다.', 'success');
+      }
+
+      saveAccounts();
+      renderAccounts();
+      closeModal('accountModal');
+    }
+
+    function deleteAccountPrompt(accId) {
+      const acc = accounts.find(a => a.id === accId);
+      if (!acc) return;
+
+      openConfirmDialog(
+        '계정 삭제 확인',
+        '\'' + acc.name + '\' 계정을 목록에서 완전히 삭제하시겠습니까?',
+        () => {
+          accounts = accounts.filter(a => a.id !== accId);
+          saveAccounts();
+          addAuditLog('DELETE_ACCOUNT', '관리자', acc.name, '계정 등록 해제 및 영구 삭제');
+          renderAccounts();
+          showToast('계정이 삭제되었습니다.', 'info');
+        }
+      );
+    }
+
+    function renderStats() {
+      const total = accounts.length;
+      const inUse = accounts.filter(a => a.status === 'IN_USE').length;
+      const available = accounts.filter(a => a.status === 'AVAILABLE').length;
+      const idle = accounts.filter(a => a.status === 'MAINTENANCE').length;
+      const occupancy = total > 0 ? Math.round((inUse / total) * 100) : 0;
+
+      document.getElementById('statTotal').innerText = total;
+      document.getElementById('statInUse').innerText = inUse;
+      document.getElementById('statOccupancyRate').innerText = '(' + occupancy + '%)';
+      document.getElementById('statAvailable').innerText = available;
+      document.getElementById('statIdle').innerText = idle;
+    }
+
+    function setProviderFilter(provider) {
+      currentProviderFilter = provider;
+      document.querySelectorAll('.filter-chip').forEach(btn => {
+        if (btn.getAttribute('data-filter') === provider) {
+          btn.className = 'filter-chip px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white transition-all shadow-sm';
+        } else {
+          btn.className = 'filter-chip px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700/80 hover:bg-slate-700 text-slate-300 transition-all';
+        }
+      });
+      renderAccounts();
+    }
+
+    function setViewMode(mode) {
+      currentViewMode = mode;
+      const gridBtn = document.getElementById('viewGridBtn');
+      const tableBtn = document.getElementById('viewTableBtn');
+      const gridContainer = document.getElementById('accountCardsContainer');
+      const tableContainer = document.getElementById('accountTableContainer');
+
+      if (mode === 'grid') {
+        gridBtn.className = 'px-2.5 py-1.5 text-xs rounded-md bg-slate-700 text-indigo-300 font-medium transition-all';
+        tableBtn.className = 'px-2.5 py-1.5 text-xs rounded-md text-slate-400 hover:text-slate-200 transition-all';
+        gridContainer.classList.remove('hidden');
+        tableContainer.classList.add('hidden');
+      } else {
+        tableBtn.className = 'px-2.5 py-1.5 text-xs rounded-md bg-slate-700 text-indigo-300 font-medium transition-all';
+        gridBtn.className = 'px-2.5 py-1.5 text-xs rounded-md text-slate-400 hover:text-slate-200 transition-all';
+        tableContainer.classList.remove('hidden');
+        gridContainer.classList.add('hidden');
+      }
+    }
+
+    function openLogsModal() {
+      const container = document.getElementById('logsListContainer');
+      if (auditLogs.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-500 py-8 text-center">기록된 작업 로그가 없습니다.</p>';
+      } else {
+        container.innerHTML = auditLogs.map(log => {
+          const date = new Date(log.timestamp);
+          const timeFormatted = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          
+          let badgeColor = 'bg-slate-700 text-slate-300';
+          let actionText = log.action;
+
+          if (log.action === 'CHECKOUT') {
+            badgeColor = 'bg-rose-500/20 text-rose-300 border border-rose-500/30';
+            actionText = '점유 시작';
+          } else if (log.action === 'EDIT_OCCUPANCY') {
+            badgeColor = 'bg-amber-500/20 text-amber-300 border border-amber-500/30';
+            actionText = '점유 수정';
+          } else if (log.action === 'RELEASE') {
+            badgeColor = 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+            actionText = '반납 완료';
+          } else if (log.action === 'EXTEND') {
+            badgeColor = 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30';
+            actionText = '기간 연장';
+          } else if (log.action === 'CREATE_ACCOUNT') {
+            badgeColor = 'bg-blue-500/20 text-blue-300 border border-blue-500/30';
+            actionText = '계정 생성';
+          } else if (log.action === 'DELETE_ACCOUNT') {
+            badgeColor = 'bg-rose-500/20 text-rose-300 border border-rose-500/30';
+            actionText = '계정 삭제';
+          }
+
+          return '<div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-700/60 flex items-start justify-between gap-3 text-xs">' +
+            '<div class="space-y-1">' +
+              '<div class="flex items-center gap-2">' +
+                '<span class="px-2 py-0.5 rounded text-[10px] font-bold ' + badgeColor + '">' + actionText + '</span>' +
+                '<span class="font-bold text-white">' + escapeHTML(log.accountName) + '</span>' +
+                '<span class="text-slate-400">by <b class="text-slate-200">' + escapeHTML(log.userName) + '</b></span>' +
+              '</div>' +
+              '<p class="text-slate-300 text-[11px]">' + escapeHTML(log.details) + '</p>' +
+            '</div>' +
+            '<span class="text-[10px] text-slate-500 whitespace-nowrap">' + timeFormatted + '</span>' +
+          '</div>';
+        }).join('');
+      }
+      openModal('logsModal');
+    }
+
+    function clearAuditLogs() {
+      openConfirmDialog('로그 삭제', '모든 감사 로그 기록을 초기화하시겠습니까?', () => {
+        auditLogs = [];
+        saveLogs();
+        openLogsModal();
+        showToast('감사 로그가 삭제되었습니다.', 'info');
+      });
+    }
+
+    function clearAllDataPrompt() {
+      openConfirmDialog('전체 데이터 초기화', '등록된 모든 클라우드 계정과 로그를 초기화하시겠습니까?', () => {
+        accounts = [];
+        auditLogs = [];
+        localStorage.removeItem('cloudseat_accounts');
+        localStorage.removeItem('cloudseat_logs');
+        saveAccounts();
+        saveLogs();
+        renderAccounts();
+        showToast('모든 데이터가 초기화되었습니다.', 'info');
+      });
+    }
+
+    function showToast(message, type = 'info') {
+      const toast = document.getElementById('toast');
+      const msg = document.getElementById('toastMessage');
+      const icon = document.getElementById('toastIcon');
+
+      msg.innerText = message;
+      
+      if (type === 'success') {
+        toast.className = 'fixed bottom-6 right-6 z-50 transform translate-y-0 opacity-100 transition-all duration-300 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border text-xs sm:text-sm font-medium bg-emerald-950/90 text-emerald-200 border-emerald-500/40 backdrop-blur-md';
+        icon.className = 'fa-solid fa-circle-check text-emerald-400 text-lg';
+      } else if (type === 'warning') {
+        toast.className = 'fixed bottom-6 right-6 z-50 transform translate-y-0 opacity-100 transition-all duration-300 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border text-xs sm:text-sm font-medium bg-amber-950/90 text-amber-200 border-amber-500/40 backdrop-blur-md';
+        icon.className = 'fa-solid fa-triangle-exclamation text-amber-400 text-lg';
+      } else {
+        toast.className = 'fixed bottom-6 right-6 z-50 transform translate-y-0 opacity-100 transition-all duration-300 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border text-xs sm:text-sm font-medium bg-indigo-950/90 text-indigo-200 border-indigo-500/40 backdrop-blur-md';
+        icon.className = 'fa-solid fa-circle-info text-indigo-400 text-lg';
+      }
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3500);
+    }
+
+    function copyToClipboard(text, successMsg = '클립보드에 복사되었습니다') {
+      const tempInput = document.createElement('input');
+      tempInput.value = text;
+      document.body.appendChild(tempInput);
+      tempInput.select();
+      try {
+        document.execCommand('copy');
+        playChime('copy');
+        showToast(successMsg, 'success');
+      } catch (err) {
+        showToast('복사에 실패했습니다.', 'warning');
+      }
+      document.body.removeChild(tempInput);
+    }
+
+    function openModal(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.classList.remove('hidden');
+        el.classList.add('flex');
+      }
+    }
+
+    function closeModal(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.classList.add('hidden');
+        el.classList.remove('flex');
+      }
+    }
+
+    function openConfirmDialog(title, message, onConfirm) {
+      const modal = document.getElementById('confirmModal');
+      document.getElementById('confirmTitle').innerText = title;
+      document.getElementById('confirmText').innerText = message;
+      
+      const okBtn = document.getElementById('confirmOkBtn');
+      const cancelBtn = document.getElementById('confirmCancelBtn');
+
+      const cleanup = () => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        okBtn.onclick = null;
+        cancelBtn.onclick = null;
+      };
+
+      okBtn.onclick = () => {
+        cleanup();
+        onConfirm();
+      };
+      cancelBtn.onclick = () => {
+        cleanup();
+      };
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function escapeHTML(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    window.onload = function() {
+      initApp();
+    };
+  </script>
+</body>
+</html>
